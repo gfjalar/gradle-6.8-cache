@@ -1,0 +1,96 @@
+def javaVersion = org.gradle.internal.jvm.Jvm.current().javaVersion.toString()
+if (javaVersion != javaSourceVersion) {
+  throw new GradleException("Java ${javaVersion} version is used. Set Java ${javaSourceVersion} as a default: export JAVA_HOME=`/usr/libexec/java_home -v ${javaSourceVersion}`")
+}
+
+apply from: "$rootDir/gradle/extensions/set-up-root-ext.gradle"
+
+gradleEnterprise.buildScan {
+  captureTaskInputFiles = true
+  tag 'GRADLE'
+
+  value "Max Memory Per Worker", rootProject.maxMemoryPerWorker
+
+  buildFinished {
+    gradleEnterprise.buildScan {
+      publishAlwaysIf(rootProject.publishBuildScan)
+    }
+  }
+}
+
+if (rootProject.incrementalCompilation) {
+  gradleEnterprise.buildScan.tag 'INCREMENTAL'
+}
+
+allprojects  {
+  group = 'com.gfjalar'
+
+  version = rootProject.projVersion
+}
+
+subprojects {
+  apply plugin: 'scala'
+  apply plugin: 'java-library'
+
+  apply from: "$rootDir/gradle/extensions/set-up-subproject-ext.gradle"
+
+  sourceCompatibility = javaSourceVersion
+  targetCompatibility = javaTargetVersion
+
+  repositories {
+    mavenCentral()
+  }
+
+  afterEvaluate {
+    configurations.all {
+      if (name.startsWith("incrementalScalaAnalysis")) {
+        extendsFrom = []
+      }
+    }
+
+    sourceSets.main.scala.srcDirs += sourceSets.main.java.srcDirs
+    compileJava.source = sourceSets.main.java.srcDirs = []
+
+    sourceSets.test.scala.srcDirs += sourceSets.test.java.srcDirs
+    compileTestJava.source = sourceSets.test.java.srcDirs = []
+  }
+
+  dependencies {
+    api("org.scala-lang:scala-library:$scalaMajorVersion.$scalaMinorVersion")
+
+    testImplementation("junit:junit:$junitVersion")
+  }
+
+  tasks.withType(ScalaCompile) {
+    options.encoding = "UTF-8"
+
+    scalaCompileOptions.with {
+      force = ! rootProject.incrementalCompilation
+      deprecation = true
+      unchecked = true
+      //optimize = true
+      additionalParameters = ["-language:implicitConversions", "-feature"]
+      forkOptions.memoryMaximumSize = rootProject.compilerMmx
+      forkOptions.jvmArgs = [
+        "-client", "-Xss256M", "-XX:+HeapDumpOnOutOfMemoryError", "-XX:+CMSClassUnloadingEnabled",
+        ("-XX:MaxMetaspaceSize=${rootProject.compilerMaxMetaspaceSize}" as String)
+      ]
+    }
+
+    doLast {
+      if (scalaCompileOptions.force) {
+        scalaCompileOptions.incrementalOptions.analysisFile.get().asFile.delete()
+      }
+    }
+  }
+
+  afterEvaluate {
+    if (project.scalaFatalWarnings) {
+      tasks.withType(ScalaCompile) {
+        scalaCompileOptions.with {
+          additionalParameters = additionalParameters + "-Xfatal-warnings"
+        }
+      }
+    }
+  }
+}

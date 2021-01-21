@@ -1,0 +1,6 @@
+dependencies {
+  api("org.scalacheck:scalacheck_$scalaMajorVersion:$orgScalacheckVersion")
+  api("org.scalatest:scalatest_$scalaMajorVersion:$orgScalatestVersion")
+  api("org.mockito:mockito-core:$orgMockitoCoreVersion")
+  api("junit:junit:$junitVersion")
+}

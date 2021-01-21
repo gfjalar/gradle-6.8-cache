@@ -1,0 +1,24 @@
+pluginManagement {
+  repositories {
+    gradlePluginPortal()
+  }
+}
+
+plugins {
+  id "com.gradle.enterprise" version "3.3.3"
+}
+
+rootProject.name = "all"
+
+def gradleDirs = fileTree(dir: rootDir, include: '*/build.gradle').collect { it.getParentFile().getName() }
+
+gradleDirs.each { moduleName ->
+  include ":$moduleName"
+  project(":$moduleName").projectDir = file("$rootDir/$moduleName")
+}
+
+buildCache {
+  local { enabled = true }
+
+  // remote(HttpBuildCache) { ... }
+}

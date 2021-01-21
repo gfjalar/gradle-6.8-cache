@@ -1,0 +1,22 @@
+def os = java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+def maxWorkerCount = rootProject.getGradle().getStartParameter().getMaxWorkerCount()
+def totalMemoryInMB = os.getTotalPhysicalMemorySize() / 1024 / 1024
+def daemonMemoryInMB = Runtime.getRuntime().maxMemory() / 1024 / 1024
+def reservedMemoryInMB = (rootProject.findProperty('reservedMemoryInMB') ?: 4096) as int
+def maxMemoryPerWorkerInMB = ((totalMemoryInMB - daemonMemoryInMB - reservedMemoryInMB) / maxWorkerCount) as int
+ext.maxMemoryPerWorker = rootProject.findProperty('maxMemoryPerWorker') ?: "${maxMemoryPerWorkerInMB}m"
+ext.maxMetaspacePerWorker = rootProject.findProperty('maxMetaspacePerWorker') ?: '256m'
+
+ext.hasTruthfulProperty = { propertyName ->
+  def propertyValue = project.findProperty(propertyName)
+  propertyValue?.isEmpty() || propertyValue?.toBoolean()
+}
+
+ext.compilerMmx = rootProject.findProperty('compilerMmx') ?: rootProject.maxMemoryPerWorker
+ext.compilerMaxMetaspaceSize = rootProject.findProperty("compilerMaxMetaspaceSize") ?: rootProject.maxMetaspacePerWorker
+
+
+ext.projVersion = rootProject.findProperty('projVersion') ?: '20.1-SNAPSHOT'
+ext.publishBuildScan = true
+
+ext.incrementalCompilation = rootProject.hasTruthfulProperty('incrementalCompilation')
